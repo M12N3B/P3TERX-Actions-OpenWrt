@@ -10,11 +10,11 @@
 # See /LICENSE for more information.
 #
 
-# Modify default IP
-#sed -i 's/192.168.1.1/10.0.0.1/g' package/base-files/files/bin/config_generate
+# 1. 修改預設後台 IP（改為 192.168.50.1，有效防止與光貓 192.168.1.1 衝突）
+sed -i 's/192.168.1.1/10.0.0.1/g' package/base-files/files/bin/config_generate
 
-# Modify default theme
-#sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
+# 2. 修改預設主機名稱（登入後台或在網路上顯示的名字，改為 AX3000T）
+sed -i 's/OpenWrt/AX3000T/g' package/base-files/files/bin/config_generate
 
-# Modify hostname
-#sed -i 's/OpenWrt/P3TERX-Router/g' package/base-files/files/bin/config_generate
+# 3. 修改預設主題（可選：如果你在 .config 裡維持 bootstrap 則不用動這行）
+# sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
