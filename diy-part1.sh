@@ -10,9 +10,10 @@
 # See /LICENSE for more information.
 #
 
-# Uncomment a feed source
-#sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
+# 1. 註釋掉或刪除原本的 helloworld 源（既然要換 OpenClash，就不需要重疊的代理插件了）
+# echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 
-# Add a feed source
-echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
-#echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
+# 2. 直接拉取最新版 OpenClash 原始碼並精確放入 package 目錄中
+git clone --depth=1 -b master https://github.com/vernesong/OpenClash.git package/openclash-temp
+mv package/openclash-temp/luci-app-openclash package/luci-app-openclash
+rm -rf package/openclash-temp
