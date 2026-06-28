@@ -1,19 +1,129 @@
-name: OpenWrt Builder
+name: Openwrt Builder
 
 on:
   repository_dispatch:
   workflow_dispatch:
+    inputs:
+
+      # ── 版本 ──────────────────────────────────────────────────
+      openwrt_source:
+        description: '📦 OpenWrt 來源'
+        required: true
+        default: 'coolsnowwolf/lede'
+        type: choice
+        options:
+          - 'coolsnowwolf/lede'
+          - 'immortalwrt/immortalwrt'
+          - 'openwrt/openwrt'
+
+      # ── 型號 ──────────────────────────────────────────────────
+      device_target:
+        description: '📡 路由器型號'
+        required: true
+        default: 'xiaomi_mi-router-ax3000t'
+        type: choice
+        options:
+          - 'xiaomi_mi-router-ax3000t'
+          - 'xiaomi_mi-router-ax3000t-ubootmod'
+          - 'xiaomi_mi-router-wr30u-112m-nmbm'
+          - 'xiaomi_mi-router-wr30u-ubootmod'
+          - 'xiaomi_redmi-router-ax6000'
+          - 'xiaomi_redmi-router-ax6000-ubootmod'
+
+      # ── 插件 ──────────────────────────────────────────────────
+      plugin_vpn:
+        description: '🔒 科學上網插件'
+        required: false
+        default: '無'
+        type: choice
+        options:
+          - '無'
+          - luci-app-passwall
+          - luci-app-passwall2
+          - luci-app-ssr-plus
+          - luci-app-openclash
+          - luci-app-vssr
+
+      plugin_adblock:
+        description: '🛡️ 廣告過濾插件'
+        required: false
+        default: '無'
+        type: choice
+        options:
+          - '無'
+          - luci-app-adguardhome
+          - luci-app-adblock
+
+      plugin_download:
+        description: '⬇️ 下載工具'
+        required: false
+        default: '無'
+        type: choice
+        options:
+          - '無'
+          - luci-app-transmission
+          - luci-app-qbittorrent
+          - luci-app-aria2
+
+      plugin_nas:
+        description: '📁 NAS / 媒體伺服器'
+        required: false
+        default: '無'
+        type: choice
+        options:
+          - '無'
+          - luci-app-samba4
+          - luci-app-minidlna
+
+      plugin_tunnel:
+        description: '🌐 內網穿透 / VPN'
+        required: false
+        default: '無'
+        type: choice
+        options:
+          - '無'
+          - luci-app-frpc
+          - luci-app-frps
+          - luci-app-zerotier
+          - luci-app-wireguard
+
+      plugin_system:
+        description: '🔧 系統工具'
+        required: false
+        default: '無'
+        type: choice
+        options:
+          - '無'
+          - luci-app-ttyd
+          - luci-app-dockerman
+          - luci-app-netdata
+          - luci-app-ddns
+          - luci-app-upnp
+          - luci-app-wol
+          - luci-app-nlbwmon
+
+      plugin_custom:
+        description: '✏️ 自訂插件（空白分隔）'
+        required: false
+        default: ''
+        type: string
+
+      ssh:
+        description: '🖥️ SSH Debug'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 env:
-  REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: openwrt-24.10
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: .config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
-  UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
-  UPLOAD_RELEASE: true
+  UPLOAD_RELEASE: false
   TZ: Asia/Shanghai
 
 jobs:
@@ -24,96 +134,156 @@ jobs:
     - name: Checkout
       uses: actions/checkout@main
 
-    - name: Initialization environment
+    - name: Set source repo & branch
+      run: |
+        SOURCE="${{ github.event.inputs.openwrt_source }}"
+        case "$SOURCE" in
+          "coolsnowwolf/lede")
+            echo "REPO_URL=https://github.com/coolsnowwolf/lede" >> $GITHUB_ENV
+            echo "REPO_BRANCH=master" >> $GITHUB_ENV
+            ;;
+          "immortalwrt/immortalwrt")
+            echo "REPO_URL=https://github.com/immortalwrt/immortalwrt" >> $GITHUB_ENV
+            echo "REPO_BRANCH=master" >> $GITHUB_ENV
+            ;;
+          "openwrt/openwrt")
+            echo "REPO_URL=https://github.com/openwrt/openwrt" >> $GITHUB_ENV
+            echo "REPO_BRANCH=main" >> $GITHUB_ENV
+            ;;
+        esac
+
+    - name: Init env
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-        sudo docker image prune --all --force
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison \
+          build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk \
+          gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 \
+          libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev \
+          libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool \
+          lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python3 \
+          python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion \
+          swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
 
-    - name: Clone source code
-      working-directory: /workdir
+    - name: Clone source
       run: |
         git clone $REPO_URL -b $REPO_BRANCH openwrt
-        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Load custom feeds
       run: |
-        # ⚠️ 強制乾淨 feeds
-        cat > feeds.conf.default <<EOF
-src-git packages https://github.com/immortalwrt/packages
-src-git luci https://github.com/immortalwrt/luci
-src-git routing https://github.com/openwrt/routing.git
-src-git telephony https://github.com/openwrt/telephony.git
-EOF
-
-        mv feeds.conf.default openwrt/feeds.conf.default
-
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    - name: Update feeds (clean safe mode)
+    - name: Update & install feeds
       run: |
         cd openwrt
-        ./scripts/feeds clean
         ./scripts/feeds update -a
-
-    - name: Install feeds
-      run: |
-        cd openwrt
         ./scripts/feeds install -a
 
-    - name: Load custom configuration
+    - name: Load config
       run: |
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
+    - name: Set device target
+      run: |
+        cd openwrt
+        DEVICE="${{ github.event.inputs.device_target }}"
+
+        set_config() {
+          local key="$1" val="$2"
+          if grep -q "^${key}=" .config 2>/dev/null; then
+            sed -i "s|^${key}=.*|${key}=${val}|" .config
+          elif grep -q "^# ${key} is not set" .config 2>/dev/null; then
+            sed -i "s|^# ${key} is not set|${key}=${val}|" .config
+          else
+            echo "${key}=${val}" >> .config
+          fi
+        }
+
+        # mediatek/filogic 是 AX3000T、WR30U、AX6000 共用的 target/subtarget
+        set_config CONFIG_TARGET_mediatek y
+        set_config CONFIG_TARGET_mediatek_filogic y
+        set_config "CONFIG_TARGET_mediatek_filogic_DEVICE_${DEVICE}" y
+
+        echo "✔ Target set: $DEVICE"
+        grep "CONFIG_TARGET" .config
+
+    - name: Enable packages
+      run: |
+        cd openwrt
+
+        set_pkg() {
+          pkg="$1"
+          [ -z "$pkg" ] && return
+          [ "$pkg" = "無" ] && return
+          if grep -q "^CONFIG_PACKAGE_${pkg}=" .config; then
+            sed -i "s/^CONFIG_PACKAGE_${pkg}=.*/CONFIG_PACKAGE_${pkg}=y/" .config
+          elif grep -q "^# CONFIG_PACKAGE_${pkg} is not set" .config; then
+            sed -i "s/^# CONFIG_PACKAGE_${pkg} is not set/CONFIG_PACKAGE_${pkg}=y/" .config
+          else
+            echo "CONFIG_PACKAGE_${pkg}=y" >> .config
+          fi
+          echo "✔ $pkg"
+        }
+
+        for pkg in ${{ github.event.inputs.plugin_vpn }};      do set_pkg "$pkg"; done
+        for pkg in ${{ github.event.inputs.plugin_adblock }};  do set_pkg "$pkg"; done
+        for pkg in ${{ github.event.inputs.plugin_download }}; do set_pkg "$pkg"; done
+        for pkg in ${{ github.event.inputs.plugin_nas }};      do set_pkg "$pkg"; done
+        for pkg in ${{ github.event.inputs.plugin_tunnel }};   do set_pkg "$pkg"; done
+        for pkg in ${{ github.event.inputs.plugin_system }};   do set_pkg "$pkg"; done
+
+        if echo "${{ github.event.inputs.plugin_tunnel }}" | grep -q wireguard; then
+          set_pkg kmod-wireguard
+        fi
+
+        for pkg in ${{ github.event.inputs.plugin_custom }}; do set_pkg "$pkg"; done
+
+        echo "=== Active luci-app packages ==="
+        grep "CONFIG_PACKAGE_luci-app" .config || true
+
+    - name: SSH
+      uses: P3TERX/ssh2actions@v1.0.0
+      if: github.event.inputs.ssh == 'true'
+      env:
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+
     - name: Download packages
       run: |
         cd openwrt
         make defconfig
-        make download -j8
+        make download -j$(nproc)
+        find dl -size -1024c -exec rm -f {} \;
 
-    - name: Compile firmware
-      id: compile
+    - name: Compile
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j1 || make -j1 V=s
-        echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Check space usage
-      if: (!cancelled())
-      run: df -hT
+    - name: Organize firmware
+      id: organize
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      run: |
+        cd openwrt/bin/targets/*/*
+        rm -rf packages
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware
       uses: actions/upload-artifact@main
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true'
+      if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: OpenWrt-AX3000T
-        path: openwrt/bin/targets/*/*
-
-    - name: Generate release tag
-      id: tag
-      if: env.UPLOAD_RELEASE == 'true'
-      run: |
-        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
-
-    - name: Upload release
-      uses: softprops/action-gh-release@master
-      if: steps.tag.outputs.release_tag != ''
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        files: openwrt/bin/targets/*/*
+        name: OpenWrt_${{ github.event.inputs.openwrt_source }}_${{ github.event.inputs.device_target }}_${{ github.run_id }}
+        path: ${{ env.FIRMWARE }}
