@@ -1,22 +1,20 @@
-name: Openwrt Builder
+name: Build OpenWrt
 
 on:
   repository_dispatch:
   workflow_dispatch:
     inputs:
 
-      # ── 版本 ──────────────────────────────────────────────────
       openwrt_source:
         description: '📦 OpenWrt 來源'
         required: true
-        default: 'coolsnowwolf/lede'
+        default: 'lede'
         type: choice
         options:
-          - 'coolsnowwolf/lede'
-          - 'immortalwrt/immortalwrt'
-          - 'openwrt/openwrt'
+          - 'lede'
+          - 'immortalwrt'
+          - 'openwrt'
 
-      # ── 型號 ──────────────────────────────────────────────────
       device_target:
         description: '📡 路由器型號'
         required: true
@@ -30,7 +28,6 @@ on:
           - 'xiaomi_redmi-router-ax6000'
           - 'xiaomi_redmi-router-ax6000-ubootmod'
 
-      # ── 插件 ──────────────────────────────────────────────────
       plugin_vpn:
         description: '🔒 科學上網插件'
         required: false
@@ -136,17 +133,16 @@ jobs:
 
     - name: Set source repo & branch
       run: |
-        SOURCE="${{ github.event.inputs.openwrt_source }}"
-        case "$SOURCE" in
-          "coolsnowwolf/lede")
+        case "${{ github.event.inputs.openwrt_source }}" in
+          "lede")
             echo "REPO_URL=https://github.com/coolsnowwolf/lede" >> $GITHUB_ENV
             echo "REPO_BRANCH=master" >> $GITHUB_ENV
             ;;
-          "immortalwrt/immortalwrt")
+          "immortalwrt")
             echo "REPO_URL=https://github.com/immortalwrt/immortalwrt" >> $GITHUB_ENV
             echo "REPO_BRANCH=master" >> $GITHUB_ENV
             ;;
-          "openwrt/openwrt")
+          "openwrt")
             echo "REPO_URL=https://github.com/openwrt/openwrt" >> $GITHUB_ENV
             echo "REPO_BRANCH=main" >> $GITHUB_ENV
             ;;
@@ -210,12 +206,11 @@ jobs:
           fi
         }
 
-        # mediatek/filogic 是 AX3000T、WR30U、AX6000 共用的 target/subtarget
         set_config CONFIG_TARGET_mediatek y
         set_config CONFIG_TARGET_mediatek_filogic y
         set_config "CONFIG_TARGET_mediatek_filogic_DEVICE_${DEVICE}" y
 
-        echo "✔ Target set: $DEVICE"
+        echo "✔ Target: $DEVICE"
         grep "CONFIG_TARGET" .config
 
     - name: Enable packages
@@ -248,6 +243,10 @@ jobs:
         fi
 
         for pkg in ${{ github.event.inputs.plugin_custom }}; do set_pkg "$pkg"; done
+
+        # 修復：移除預設的 dnsmasq，改用 dnsmasq-full 避免衝突
+        sed -i "s/^CONFIG_PACKAGE_dnsmasq=y/# CONFIG_PACKAGE_dnsmasq is not set/" .config
+        echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
 
         echo "=== Active luci-app packages ==="
         grep "CONFIG_PACKAGE_luci-app" .config || true
