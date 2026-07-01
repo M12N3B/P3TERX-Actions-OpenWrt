@@ -244,18 +244,7 @@ jobs:
 
         for pkg in ${{ github.event.inputs.plugin_custom }}; do set_pkg "$pkg"; done
 
-        # 修復：移除預設的 dnsmasq，改用 dnsmasq-full 避免衝突
-        sed -i "s/^CONFIG_PACKAGE_dnsmasq=y/# CONFIG_PACKAGE_dnsmasq is not set/" .config
-        echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
-
-        # 修復：libustream-openssl 與 libustream-mbedtls 衝突
-        # 只有選擇 PassWall/OpenClash 等 VPN 插件時才需要切換
-        if [ "${{ github.event.inputs.plugin_vpn }}" != "無" ]; then
-          sed -i "s/^CONFIG_PACKAGE_libustream-mbedtls=y/# CONFIG_PACKAGE_libustream-mbedtls is not set/" .config
-          sed -i "/^CONFIG_PACKAGE_libustream-mbedtls20201210=y/d" .config
-          echo "CONFIG_PACKAGE_libustream-openssl=y" >> .config
-          echo "✔ Switched to libustream-openssl (VPN plugin detected)"
-        fi
+        # dnsmasq-full 與 libustream-openssl 已在 .config 裡直接設定，不需要在這裡 patch
 
         echo "=== Active luci-app packages ==="
         grep "CONFIG_PACKAGE_luci-app" .config || true
